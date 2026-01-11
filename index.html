@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="logo.png">
 <title>Sendly | Send Files</title>
 <style>
     * {
@@ -464,124 +463,123 @@ const progressFill = document.getElementById("progressFill");
 const stats = document.getElementById("stats");
 const progressPercent = document.getElementById("progressPercent");
 
-dropZone.addEventListener("click", () => fileInput.click());
-dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
-dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-dropZone.addEventListener("drop", e => {
-  e.preventDefault();
-  dropZone.classList.remove("dragover");
-  if (e.dataTransfer.files.length) createOffer(e.dataTransfer.files[0]);
+function formatFileSize(size){
+    if(size<1024) return size + " B";
+    else if(size<1024*1024) return (size/1024).toFixed(2) + " KB";
+    else if(size<1024*1024*1024) return (size/1024/1024).toFixed(2) + " MB";
+    else return (size/1024/1024/1024).toFixed(2) + " GB";
+}
+
+dropZone.addEventListener("click", ()=>fileInput.click());
+dropZone.addEventListener("dragover", e=>{ e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", ()=>dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop", e=>{
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if(e.dataTransfer.files.length) createOffer(e.dataTransfer.files[0]);
 });
 
 let pc, dc;
-let file, received = [];
-const CHUNK = 256 * 1024;
-const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+let file, received=[];
+const CHUNK = 256*1024;
+const iceConfig = { iceServers:[{urls:"stun:stun.l.google.com:19302"}] };
 
-function code() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
-
-async function sendSignal(path, data) { await set(ref(db, path), { data, t: Date.now() }); }
-async function getSignal(path) { const snap = await get(ref(db, path)); return snap.exists() ? snap.val().data : null; }
-async function clearSignal(path) { await remove(ref(db, path)); }
+function code(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
+async function sendSignal(path,data){ await set(ref(db,path),{data,t:Date.now()}); }
+async function getSignal(path){ const snap=await get(ref(db,path)); return snap.exists()?snap.val().data:null; }
+async function clearSignal(path){ await remove(ref(db,path)); }
 
 // ---------- SENDER ----------
-async function createOffer(selectedFile) {
-  file = selectedFile;
-  fileInfo.classList.add("active");
-  fileInfo.querySelector("#fileName").textContent = file.name;
-  fileInfo.querySelector("#fileSize").textContent = (file.size/1024/1024).toFixed(2)+" MB";
-  
-  const transferCode = code();
-  shareCode.textContent = transferCode;
+async function createOffer(selectedFile){
+    file=selectedFile;
+    fileInfo.classList.add("active");
+    fileInfo.querySelector("#fileName").textContent=file.name;
+    fileInfo.querySelector("#fileSize").textContent=formatFileSize(file.size);
 
-  pc = new RTCPeerConnection(iceConfig);
-  dc = pc.createDataChannel("file");
-  dc.onopen = sendFile;
+    const transferCode = code();
+    shareCode.textContent = transferCode;
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+    pc = new RTCPeerConnection(iceConfig);
+    dc = pc.createDataChannel("file");
+    dc.onopen = sendFile;
 
-  await sendSignal(`offers/${transferCode}`, { sdp: offer.sdp, name: file.name, size: file.size, type: file.type });
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-  onValue(ref(db, `answers/${transferCode}`), async snap => {
-    if (!snap.exists()) return;
-    const ans = snap.val().data;
-    await pc.setRemoteDescription({ type: "answer", sdp: ans.sdp });
-    await clearSignal(`answers/${transferCode}`);
-  });
+    await sendSignal(`offers/${transferCode}`, { sdp: offer.sdp, name:file.name, size:file.size, type:file.type });
+
+    onValue(ref(db,`answers/${transferCode}`), async snap=>{
+        if(!snap.exists()) return;
+        const ans = snap.val().data;
+        await pc.setRemoteDescription({type:"answer", sdp:ans.sdp});
+        await clearSignal(`answers/${transferCode}`);
+    });
 }
 
-function sendFile() {
-  let offset = 0;
-  progressBar.classList.add("active");
-  stats.style.display = "flex";
+function sendFile(){
+    let offset=0;
+    progressBar.classList.add("active");
+    stats.style.display="flex";
+    dc.bufferedAmountLowThreshold = CHUNK*4;
 
-  dc.bufferedAmountLowThreshold = CHUNK * 4;
+    const reader = async ()=>{
+        if(offset<file.size){
+            const slice = file.slice(offset, offset+CHUNK);
+            dc.send(await slice.arrayBuffer());
+            offset += CHUNK;
+            const percent=Math.floor((offset/file.size)*100);
+            progressFill.style.width = percent+"%";
+            progressPercent.textContent = percent+"%";
 
-  const reader = async () => {
-    if (offset < file.size) {
-      const slice = file.slice(offset, offset + CHUNK);
-      dc.send(await slice.arrayBuffer());
-      offset += CHUNK;
-
-      const percent = Math.floor((offset/file.size)*100);
-      progressFill.style.width = percent+"%";
-      progressPercent.textContent = percent+"%";
-
-      if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
-        dc.onbufferedamountlow = reader;
-      } else {
-        reader();
-      }
-    }
-  };
-  reader();
+            if(dc.bufferedAmount > dc.bufferedAmountLowThreshold) dc.onbufferedamountlow=reader;
+            else reader();
+        }
+    };
+    reader();
 }
 
 // ---------- RECEIVER ----------
-async function createAnswer(transferCode) {
-  const offer = await getSignal(`offers/${transferCode}`);
-  if (!offer) { alert("Invalid code"); return; }
+async function createAnswer(transferCode){
+    const offer = await getSignal(`offers/${transferCode}`);
+    if(!offer){ alert("Invalid code"); return; }
 
-  pc = new RTCPeerConnection(iceConfig);
-  received = [];
-  progressBar.classList.add("active");
-  stats.style.display = "flex";
+    pc = new RTCPeerConnection(iceConfig);
+    received=[];
+    progressBar.classList.add("active");
+    stats.style.display="flex";
 
-  pc.ondatachannel = e => {
-    dc = e.channel;
-    dc.onmessage = ev => {
-      received.push(ev.data instanceof ArrayBuffer ? ev.data : ev.data.buffer);
-      const receivedSize = received.reduce((a,b)=>a+b.byteLength,0);
+    pc.ondatachannel = e=>{
+        dc=e.channel;
+        dc.onmessage = ev=>{
+            received.push(ev.data instanceof ArrayBuffer?ev.data:ev.data.buffer);
+            const receivedSize = received.reduce((a,b)=>a+b.byteLength,0);
+            const percent=Math.floor((receivedSize/offer.size)*100);
+            progressFill.style.width=percent+"%";
+            progressPercent.textContent=percent+"%";
 
-      const percent = Math.floor((receivedSize/offer.size)*100);
-      progressFill.style.width = percent+"%";
-      progressPercent.textContent = percent+"%";
-
-      if (receivedSize >= offer.size) {
-        const blob = new Blob(received, { type: offer.type });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = offer.name;
-        a.click();
-        received = [];
-        progressFill.style.width = "100%";
-        progressPercent.textContent = "100%";
-      }
+            if(receivedSize>=offer.size){
+                const blob=new Blob(received,{type:offer.type});
+                const a=document.createElement("a");
+                a.href=URL.createObjectURL(blob);
+                a.download=offer.name;
+                a.click();
+                received=[];
+                progressFill.style.width="100%";
+                progressPercent.textContent="100%";
+            }
+        };
     };
-  };
 
-  await pc.setRemoteDescription({ type: "offer", sdp: offer.sdp });
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
+    await pc.setRemoteDescription({type:"offer", sdp:offer.sdp});
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
 
-  await sendSignal(`answers/${transferCode}`, { sdp: answer.sdp });
+    await sendSignal(`answers/${transferCode}`, { sdp: answer.sdp });
 }
 
 // ---------- UI ----------
 fileInput.onchange = e => createOffer(e.target.files[0]);
-connectBtn.onclick = () => createAnswer(codeInput.value.trim().toUpperCase());
+connectBtn.onclick = ()=>createAnswer(codeInput.value.trim().toUpperCase());
 </script>
 </body>
 </html>
-
