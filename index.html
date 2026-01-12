@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sendly</title>
+  <!-- <meta http-equiv="refresh" content="1"> -->
+  <title>Sendly — Private File Sharing</title>
   <link rel="icon" href="logo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -25,13 +29,13 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+      font-family:Inter,system-ui,sans-serif;
+      background:radial-gradient(circle at top,#1a1a1a,#0a0a0a 70%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px
     }
 
     .container {
@@ -64,8 +68,8 @@
 
     .subtitle {
       color: #666;
-      margin-bottom: 30px;
-      font-size: 14px;
+      margin-bottom: 25px;
+      font-size: 15px;
       text-align: center;
       line-height: 1.5;
     }
@@ -81,41 +85,36 @@
     }
 
     .drop-zone {
-      border: 3px dashed #667eea;
-      border-radius: 15px;
-      padding: 60px 20px;
+      border: 1.5px dashed #d1d5db;
+      border-radius: 16px;
+      padding: 52px 24px;
       text-align: center;
       cursor: pointer;
       transition: all 0.3s;
-      background: #f8f9ff;
+      background: #f9fafb;
+    }
+    .drop-zone-hint {
+      color: #999;
+      font-size: 13px;
     }
 
     .drop-zone:hover {
-      border-color: #764ba2;
-      background: #f0f2ff;
+      border-color: black;
+      background: #f0f0f0;
+      transform: scale(1.01);
     }
 
     .drop-zone.dragover {
-      border-color: #764ba2;
-      background: #e8ebff;
-      transform: scale(1.02);
-    }
-
-    .drop-zone-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
+      border-color: black;
+      background: #f0f0f0;
+      transform: scale(1.01);
     }
 
     .drop-zone-text {
-      color: #667eea;
+      color: #222222;
       font-size: 18px;
       font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .drop-zone-hint {
-      color: #999;
-      font-size: 14px;
+      margin-bottom: 1px;
     }
 
     .file-input {
@@ -123,8 +122,9 @@
     }
 
     .file-info {
-      background: #f8f9ff;
-      border-radius: 10px;
+      border: 1.5px solid #d1d5db;
+      background: #f9fafb;
+      border-radius: 17px;
       padding: 20px;
       margin-top: 20px;
       display: none;
@@ -136,7 +136,7 @@
 
     .file-name {
       font-weight: 600;
-      color: #333;
+      color: #222222;
       margin-bottom: 8px;
       word-break: break-all;
     }
@@ -148,15 +148,15 @@
     }
 
     .share-code {
-      background: white;
-      border: 2px solid #667eea;
-      border-radius: 8px;
-      padding: 20px;
+      background:white;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px;
       font-size: 32px;
       text-align: center;
       margin-bottom: 10px;
-      color: #667eea;
-      font-family: 'Courier New', monospace;
+      color: #424242;
+      font-family: monospace;
       font-weight: 700;
       letter-spacing: 8px;
     }
@@ -171,17 +171,18 @@
 
     .code-label {
       text-align: center;
-      font-size: 13px;
-      color: #999;
-      margin-bottom: 15px;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 12px;
     }
 
     .btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: rgb(61, 61, 61);
       color: white;
       border: none;
-      border-radius: 8px;
-      padding: 12px 24px;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-family: Inter, system-ui, sans-serif;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
@@ -191,11 +192,11 @@
     }
 
     .btn:hover {
-      transform: translateY(-2px);
+      transform: scale(1.01);
     }
 
     .btn:active {
-      transform: translateY(0);
+      transform: scale(1);
     }
 
     .btn:disabled {
@@ -207,7 +208,7 @@
     .status {
       margin-top: 20px;
       padding: 15px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
       display: none;
     }
@@ -219,16 +220,22 @@
     .status.info {
       background: #e3f2fd;
       color: #1976d2;
+      border-radius: 10px;
+      border: 1.5px solid #1976d2;
     }
 
     .status.success {
       background: #e8f5e9;
       color: #388e3c;
+      border-radius: 10px;
+      border: 1.5px solid #388E3C;
     }
 
     .status.error {
       background: #ffebee;
       color: #c62828;
+      border-radius: 10px;
+      border: 1.5px solid #388E3C;
     }
 
     .progress-bar {
@@ -247,7 +254,7 @@
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      background: rgb(61, 61, 61);
       width: 0%;
       transition: width 0.2s;
     }
@@ -258,7 +265,8 @@
       margin-top: 15px;
       padding: 12px;
       background: white;
-      border-radius: 8px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
     }
 
     .connection-status {
@@ -301,7 +309,7 @@
     .stat-value {
       font-size: 20px;
       font-weight: 700;
-      color: #667eea;
+      color: rgb(61, 61, 61);
     }
 
     .stat-label {
@@ -324,8 +332,9 @@
     .input-section {
       margin-top: 20px;
       padding: 20px;
-      background: #f8f9ff;
-      border-radius: 10px;
+      border: 1.5px solid #d1d5db;
+      background: #f9fafb;
+      border-radius: 15px;
     }
 
     .input-label {
@@ -337,11 +346,11 @@
 
     .code-input {
       width: 100%;
-      padding: 15px;
+      padding: 10px;
       font-size: 24px;
       text-align: center;
-      border: 2px solid #667eea;
-      border-radius: 8px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
       font-family: 'Courier New', monospace;
       letter-spacing: 6px;
       text-transform: uppercase;
@@ -349,8 +358,7 @@
     }
 
     .code-input:focus {
-      border-color: #764ba2;
-      box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+      border-color: black;
     }
     
     @media (max-width: 600px) {
@@ -362,24 +370,42 @@
     }
 
     .or-divider {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
       margin: 20px 0;
       color: #999;
       font-size: 14px;
+    }
+
+    .or-divider::before,
+    .or-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e5e7eb;
+    }
+    .or-divider::before,
+    .or-divider::after {
+      background: linear-gradient(to right, transparent, #e5e7eb);
+    }
+
+    .or-divider::after {
+      background: linear-gradient(to left, transparent, #e5e7eb);
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div style="text-align: center;">
-      <h1>📁 P2P File Transfer</h1>
-      <p class="subtitle">Share files between any devices. Fast transfer.</p>
+      <h1>Sendly</h1>
+      <p class="subtitle">Private file transfer between devices • No signup</p>
     </div>
 
     <div class="drop-zone" id="dropZone">
-      <div class="drop-zone-icon">📤</div>
-      <div class="drop-zone-text">Drop a file here or click to select</div>
-      <div class="drop-zone-hint">Works on any device • No size limit • Fast</div>
+      <div class="drop-zone-text">Drop a file to share</div>
+      <div class="drop-zone-hint">A one-time code will be generated</div>
     </div>
 
     <input type="file" id="fileInput" class="file-input">
@@ -391,7 +417,7 @@
       <div class="share-code" id="shareCode">------</div>
       <div class="code-label">Share this code with the receiver</div>
       
-      <button class="btn" id="copyBtn">📋 Copy Code</button>
+      <button class="btn" id="copyBtn">Copy Code</button>
 
       <div class="peer-info" id="peerInfo">
         <span class="connection-status" id="connectionStatus"></span>
@@ -402,9 +428,8 @@
     <div class="or-divider" id="orDivider">OR</div>
 
     <div class="input-section" id="inputSection">
-      <div class="input-label">Enter transfer code to receive file:</div>
-      <input type="text" id="codeInput" class="code-input" placeholder="XXXXXX" maxlength="6">
-      <button class="btn" id="connectBtn">🔗 Connect & Download</button>
+      <input type="text" id="codeInput" class="code-input" placeholder="Enter 6-digit code" maxlength="6">
+      <button class="btn" id="connectBtn">Download File</button>
     </div>
 
     <div class="status" id="status"></div>
@@ -514,9 +539,21 @@
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    function showStatus(message, type) {
+    let statusTimeout;
+
+    function showStatus(message, type, autoHide = false) {
       status.textContent = message;
       status.className = 'status active ' + type;
+
+      // Clear any previous timer
+      if (statusTimeout) clearTimeout(statusTimeout);
+
+      // Auto-hide after 5s if requested
+      if (autoHide) {
+        statusTimeout = setTimeout(() => {
+          status.classList.remove('active');
+        }, 5000);
+      }
     }
 
     function updateConnectionStatus(connected) {
@@ -599,7 +636,7 @@
             timestamp: Date.now()
           });
           
-          showStatus('✓ Code ready! Share with receiver.', 'success');
+          showStatus('✓ Code ready! Share with receiver.', 'success', true);
           statusText.textContent = 'Waiting for receiver...';
         }
       };
