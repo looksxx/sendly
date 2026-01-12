@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sendly | Send Files</title>
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P File Transfer</title>
+  <style>
     * {
       margin: 0;
       padding: 0;
@@ -320,17 +320,6 @@
       }
     }
 
-    .mode-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      margin-left: 10px;
-    }
-
     .input-section {
       margin-top: 20px;
       padding: 20px;
@@ -377,209 +366,456 @@
       color: #999;
       font-size: 14px;
     }
-</style>
+  </style>
 </head>
 <body>
-<div class="container">
-  <div style="text-align: center;">
-    <h1>Sendly</h1>
-    <p class="subtitle">Share files between any devices.</p>
-  </div>
+  <div class="container">
+    <div style="text-align: center;">
+      <h1>📁 P2P File Transfer</h1>
+      <p class="subtitle">Share files between any devices. Lightning-fast peer-to-peer transfer.</p>
+    </div>
 
-  <div class="drop-zone" id="dropZone">
-    <div class="drop-zone-icon">📤</div>
-    <div class="drop-zone-text">Drop a file here or click to select</div>
-    <div class="drop-zone-hint">Works on any device • No size limit • Ultra-fast</div>
-  </div>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-icon">📤</div>
+      <div class="drop-zone-text">Drop a file here or click to select</div>
+      <div class="drop-zone-hint">Works on any device • No size limit • Ultra-fast</div>
+    </div>
 
-  <input type="file" id="fileInput" class="file-input">
+    <input type="file" id="fileInput" class="file-input">
 
-  <div class="file-info" id="fileInfo">
-    <div class="file-name" id="fileName"></div>
-    <div class="file-size" id="fileSize"></div>
+    <div class="file-info" id="fileInfo">
+      <div class="file-name" id="fileName"></div>
+      <div class="file-size" id="fileSize"></div>
+      
+      <div class="share-code" id="shareCode">------</div>
+      <div class="code-label">Share this code with the receiver</div>
+      
+      <button class="btn" id="copyBtn">📋 Copy Code</button>
 
-    <div class="share-code" id="shareCode">------</div>
-    <div class="code-label">Share this code with the receiver</div>
+      <div class="peer-info" id="peerInfo">
+        <span class="connection-status" id="connectionStatus"></span>
+        <span id="statusText">Waiting for peer to connect...</span>
+      </div>
+    </div>
 
-    <button class="btn" id="copyBtn">📋 Copy Code</button>
+    <div class="or-divider" id="orDivider">OR</div>
 
-    <div class="peer-info" id="peerInfo">
-      <span class="connection-status" id="connectionStatus"></span>
-      <span id="statusText">Waiting for peer to connect...</span>
+    <div class="input-section" id="inputSection">
+      <div class="input-label">Enter transfer code to receive file:</div>
+      <input type="text" id="codeInput" class="code-input" placeholder="XXXXXX" maxlength="6">
+      <button class="btn" id="connectBtn">🔗 Connect & Download</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div class="stats" id="stats" style="display: none;">
+      <div class="stat">
+        <div class="stat-value" id="progressPercent">0%</div>
+        <div class="stat-label">Progress</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="transferSpeed">0 MB/s</div>
+        <div class="stat-label">Speed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="timeRemaining">--:--</div>
+        <div class="stat-label">Time Left</div>
+      </div>
     </div>
   </div>
 
-  <div class="or-divider" id="orDivider">OR</div>
+  <script type="module">
+    import { getDatabase, ref, set, get, remove, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 
-  <div class="input-section" id="inputSection">
-    <div class="input-label">Enter transfer code to receive file:</div>
-    <input type="text" id="codeInput" class="code-input" placeholder="XXXXXX" maxlength="6">
-    <button class="btn" id="connectBtn">🔗 Connect & Download</button>
-  </div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDm6YJ19Pnh718AjjIN32KxltRo6qpgqtM",
+      authDomain: "sendly-83909.firebaseapp.com",
+      databaseURL: "https://sendly-83909-default-rtdb.firebaseio.com",
+      projectId: "sendly-83909",
+      storageBucket: "sendly-83909.firebasestorage.app",
+      messagingSenderId: "1075199067786",
+      appId: "1:1075199067786:web:55163b960bd5c26f6d4f73"
+    };
 
-  <div class="status" id="status"></div>
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-  <div class="progress-bar" id="progressBar">
-    <div class="progress-fill" id="progressFill"></div>
-  </div>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const shareCode = document.getElementById('shareCode');
+    const copyBtn = document.getElementById('copyBtn');
+    const status = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const statusText = document.getElementById('statusText');
+    const stats = document.getElementById('stats');
+    const progressPercent = document.getElementById('progressPercent');
+    const transferSpeed = document.getElementById('transferSpeed');
+    const timeRemaining = document.getElementById('timeRemaining');
+    const inputSection = document.getElementById('inputSection');
+    const codeInput = document.getElementById('codeInput');
+    const connectBtn = document.getElementById('connectBtn');
+    const orDivider = document.getElementById('orDivider');
 
-  <div class="stats" id="stats" style="display: none;">
-    <div class="stat">
-      <div class="stat-value" id="progressPercent">0%</div>
-      <div class="stat-label">Progress</div>
-    </div>
-  </div>
-</div>
+    let peerConnection = null;
+    let dataChannel = null;
+    let selectedFile = null;
+    let receivedChunks = [];
+    let receivedSize = 0;
+    let totalSize = 0;
+    let fileMetadata = null;
+    let startTime = 0;
+    let lastUpdate = 0;
+    let bytesAtLastUpdate = 0;
+    let transferCode = null;
 
-<script type="module">
-import { getDatabase, ref, set, get, remove, onValue } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
+    const CHUNK_SIZE = 262144;
 
-// Firebase config
-const firebaseConfig = {
-    apiKey: "AIzaSyDm6YJ19Pnh718AjjIN32KxltRo6qpgqtM",
-    authDomain: "sendly-83909.firebaseapp.com",
-    databaseURL: "https://sendly-83909-default-rtdb.firebaseio.com",
-    projectId: "sendly-83909",
-    storageBucket: "sendly-83909.firebasestorage.app",
-    messagingSenderId: "1075199067786",
-    appId: "1:1075199067786:web:55163b960bd5c26f6d4f73",
-    measurementId: "G-LENJ8MKEW5"
-};
+    const config = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
+      ]
+    };
 
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const db = getDatabase(app);
+    function generateCode() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
 
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const shareCode = document.getElementById("shareCode");
-const connectBtn = document.getElementById("connectBtn");
-const codeInput = document.getElementById("codeInput");
-const fileInfo = document.getElementById("fileInfo");
-const progressBar = document.getElementById("progressBar");
-const progressFill = document.getElementById("progressFill");
-const stats = document.getElementById("stats");
-const progressPercent = document.getElementById("progressPercent");
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+    }
 
-function formatFileSize(size){
-    if(size<1024) return size + " B";
-    else if(size<1024*1024) return (size/1024).toFixed(2) + " KB";
-    else if(size<1024*1024*1024) return (size/1024/1024).toFixed(2) + " MB";
-    else return (size/1024/1024/1024).toFixed(2) + " GB";
-}
+    function formatSpeed(bytesPerSecond) {
+      return formatFileSize(bytesPerSecond) + '/s';
+    }
 
-dropZone.addEventListener("click", ()=>fileInput.click());
-dropZone.addEventListener("dragover", e=>{ e.preventDefault(); dropZone.classList.add("dragover"); });
-dropZone.addEventListener("dragleave", ()=>dropZone.classList.remove("dragover"));
-dropZone.addEventListener("drop", e=>{
-    e.preventDefault();
-    dropZone.classList.remove("dragover");
-    if(e.dataTransfer.files.length) createOffer(e.dataTransfer.files[0]);
-});
+    function formatTime(seconds) {
+      if (!isFinite(seconds) || seconds < 0) return '--:--';
+      if (seconds < 60) return Math.floor(seconds) + 's';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 
-let pc, dc;
-let file, received=[];
-const CHUNK = 256*1024;
-const iceConfig = { iceServers:[{urls:"stun:stun.l.google.com:19302"}] };
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = 'status active ' + type;
+    }
 
-function code(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
-async function sendSignal(path,data){ await set(ref(db,path),{data,t:Date.now()}); }
-async function getSignal(path){ const snap=await get(ref(db,path)); return snap.exists()?snap.val().data:null; }
-async function clearSignal(path){ await remove(ref(db,path)); }
+    function updateConnectionStatus(connected) {
+      if (connected) {
+        connectionStatus.classList.add('connected');
+        statusText.textContent = '✓ Connected!';
+      } else {
+        connectionStatus.classList.remove('connected');
+      }
+    }
 
-// ---------- SENDER ----------
-async function createOffer(selectedFile){
-    file=selectedFile;
-    fileInfo.classList.add("active");
-    fileInfo.querySelector("#fileName").textContent=file.name;
-    fileInfo.querySelector("#fileSize").textContent=formatFileSize(file.size);
+    function updateProgress(current, total) {
+      const now = Date.now();
+      const percent = (current / total * 100);
+      progressFill.style.width = percent + '%';
+      progressPercent.textContent = percent.toFixed(1) + '%';
 
-    const transferCode = code();
-    shareCode.textContent = transferCode;
+      if (now - lastUpdate > 500) {
+        const timeDiff = (now - lastUpdate) / 1000;
+        const bytesDiff = current - bytesAtLastUpdate;
+        const speed = bytesDiff / timeDiff;
+        
+        transferSpeed.textContent = formatSpeed(speed);
+        
+        const remaining = (total - current) / speed;
+        timeRemaining.textContent = formatTime(remaining);
+        
+        lastUpdate = now;
+        bytesAtLastUpdate = current;
+      }
+    }
 
-    pc = new RTCPeerConnection(iceConfig);
-    dc = pc.createDataChannel("file");
-    dc.onopen = sendFile;
+    // SENDER
+    async function createOffer(file) {
+      selectedFile = file;
+      transferCode = generateCode();
+      
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      shareCode.textContent = transferCode;
+      
+      fileInfo.classList.add('active');
+      dropZone.style.display = 'none';
+      inputSection.style.display = 'none';
+      orDivider.style.display = 'none';
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+      showStatus('Setting up connection...', 'info');
+      statusText.textContent = 'Creating offer...';
 
-    await sendSignal(`offers/${transferCode}`, { sdp: offer.sdp, name:file.name, size:file.size, type:file.type });
+      peerConnection = new RTCPeerConnection(config);
+      
+      dataChannel = peerConnection.createDataChannel('fileTransfer', {
+        ordered: true
+      });
+      dataChannel.binaryType = 'arraybuffer';
 
-    onValue(ref(db,`answers/${transferCode}`), async snap=>{
-        if(!snap.exists()) return;
-        const ans = snap.val().data;
-        await pc.setRemoteDescription({type:"answer", sdp:ans.sdp});
-        await clearSignal(`answers/${transferCode}`);
-    });
-}
+      dataChannel.onopen = async () => {
+        updateConnectionStatus(true);
+        showStatus('✓ Connected! Starting transfer...', 'success');
+        statusText.textContent = 'Transferring...';
+        await sendFile();
+      };
 
-function sendFile(){
-    let offset=0;
-    progressBar.classList.add("active");
-    stats.style.display="flex";
-    dc.bufferedAmountLowThreshold = CHUNK*4;
-
-    const reader = async ()=>{
-        if(offset<file.size){
-            const slice = file.slice(offset, offset+CHUNK);
-            dc.send(await slice.arrayBuffer());
-            offset += CHUNK;
-            const percent=Math.floor((offset/file.size)*100);
-            progressFill.style.width = percent+"%";
-            progressPercent.textContent = percent+"%";
-
-            if(dc.bufferedAmount > dc.bufferedAmountLowThreshold) dc.onbufferedamountlow=reader;
-            else reader();
+      // Collect ICE candidates
+      const iceCandidates = [];
+      peerConnection.onicecandidate = async (event) => {
+        if (event.candidate) {
+          iceCandidates.push(event.candidate.toJSON());
+        } else {
+          // All candidates gathered, save to Firebase
+          await set(ref(db, `offers/${transferCode}`), {
+            sdp: peerConnection.localDescription.sdp,
+            candidates: iceCandidates,
+            fileInfo: {
+              name: file.name,
+              size: file.size,
+              type: file.type
+            },
+            timestamp: Date.now()
+          });
+          
+          showStatus('✓ Code ready! Share with receiver.', 'success');
+          statusText.textContent = 'Waiting for receiver...';
         }
-    };
-    reader();
-}
+      };
 
-// ---------- RECEIVER ----------
-async function createAnswer(transferCode){
-    const offer = await getSignal(`offers/${transferCode}`);
-    if(!offer){ alert("Invalid code"); return; }
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
 
-    pc = new RTCPeerConnection(iceConfig);
-    received=[];
-    progressBar.classList.add("active");
-    stats.style.display="flex";
+      // Listen for answer
+      const answerRef = ref(db, `answers/${transferCode}`);
+      onValue(answerRef, async (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          
+          await peerConnection.setRemoteDescription({
+            type: 'answer',
+            sdp: data.sdp
+          });
 
-    pc.ondatachannel = e=>{
-        dc=e.channel;
-        dc.onmessage = ev=>{
-            received.push(ev.data instanceof ArrayBuffer?ev.data:ev.data.buffer);
-            const receivedSize = received.reduce((a,b)=>a+b.byteLength,0);
-            const percent=Math.floor((receivedSize/offer.size)*100);
-            progressFill.style.width=percent+"%";
-            progressPercent.textContent=percent+"%";
-
-            if(receivedSize>=offer.size){
-                const blob=new Blob(received,{type:offer.type});
-                const a=document.createElement("a");
-                a.href=URL.createObjectURL(blob);
-                a.download=offer.name;
-                a.click();
-                received=[];
-                progressFill.style.width="100%";
-                progressPercent.textContent="100%";
+          // Add ICE candidates from receiver
+          if (data.candidates) {
+            for (const candidate of data.candidates) {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
             }
+          }
+
+          statusText.textContent = 'Establishing connection...';
+          
+          // Cleanup
+          await remove(answerRef);
+        }
+      });
+    }
+
+    async function sendFile() {
+      if (!selectedFile || !dataChannel) return;
+
+      stats.style.display = 'flex';
+      progressBar.classList.add('active');
+      startTime = Date.now();
+      lastUpdate = startTime;
+      bytesAtLastUpdate = 0;
+
+      const chunkCount = Math.ceil(selectedFile.size / CHUNK_SIZE);
+      
+      for (let i = 0; i < chunkCount; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, selectedFile.size);
+        const chunk = selectedFile.slice(start, end);
+        
+        const arrayBuffer = await chunk.arrayBuffer();
+        
+        while (dataChannel.bufferedAmount > CHUNK_SIZE * 4) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        dataChannel.send(arrayBuffer);
+        updateProgress(end, selectedFile.size);
+      }
+
+      showStatus('✓ Transfer complete!', 'success');
+      statusText.textContent = '✓ File sent successfully!';
+      
+      // Cleanup Firebase
+      await remove(ref(db, `offers/${transferCode}`));
+    }
+
+    // RECEIVER
+    async function createAnswer(code) {
+      showStatus('Looking for transfer...', 'info');
+      
+      const offerSnapshot = await get(ref(db, `offers/${code}`));
+      
+      if (!offerSnapshot.exists()) {
+        showStatus('❌ Invalid code or transfer expired', 'error');
+        return;
+      }
+
+      const offerData = offerSnapshot.val();
+      fileMetadata = offerData.fileInfo;
+      totalSize = fileMetadata.size;
+
+      fileName.textContent = fileMetadata.name;
+      fileSize.textContent = formatFileSize(fileMetadata.size);
+      fileInfo.classList.add('active');
+      
+      dropZone.style.display = 'none';
+      inputSection.style.display = 'none';
+      orDivider.style.display = 'none';
+
+      showStatus('✓ Found transfer! Connecting...', 'success');
+      statusText.textContent = 'Establishing connection...';
+
+      peerConnection = new RTCPeerConnection(config);
+
+      peerConnection.ondatachannel = (event) => {
+        dataChannel = event.channel;
+        dataChannel.binaryType = 'arraybuffer';
+
+        dataChannel.onmessage = (e) => {
+          receivedChunks.push(e.data);
+          receivedSize += e.data.byteLength;
+          updateProgress(receivedSize, totalSize);
+
+          if (receivedSize >= totalSize) {
+            saveReceivedFile();
+          }
         };
-    };
 
-    await pc.setRemoteDescription({type:"offer", sdp:offer.sdp});
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+        dataChannel.onopen = () => {
+          updateConnectionStatus(true);
+          showStatus('✓ Connected! Receiving file...', 'success');
+          statusText.textContent = 'Downloading...';
+          stats.style.display = 'flex';
+          progressBar.classList.add('active');
+          startTime = Date.now();
+          lastUpdate = startTime;
+          bytesAtLastUpdate = 0;
+        };
+      };
 
-    await sendSignal(`answers/${transferCode}`, { sdp: answer.sdp });
-}
+      // Collect ICE candidates
+      const iceCandidates = [];
+      peerConnection.onicecandidate = async (event) => {
+        if (event.candidate) {
+          iceCandidates.push(event.candidate.toJSON());
+        } else {
+          // All candidates gathered, save answer to Firebase
+          await set(ref(db, `answers/${code}`), {
+            sdp: peerConnection.localDescription.sdp,
+            candidates: iceCandidates,
+            timestamp: Date.now()
+          });
+        }
+      };
 
-// ---------- UI ----------
-fileInput.onchange = e => createOffer(e.target.files[0]);
-connectBtn.onclick = ()=>createAnswer(codeInput.value.trim().toUpperCase());
-</script>
+      await peerConnection.setRemoteDescription({
+        type: 'offer',
+        sdp: offerData.sdp
+      });
+
+      // Add ICE candidates from sender
+      if (offerData.candidates) {
+        for (const candidate of offerData.candidates) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      }
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+    }
+
+    function saveReceivedFile() {
+      const blob = new Blob(receivedChunks, { type: fileMetadata.type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileMetadata.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus('✓ Download complete!', 'success');
+      statusText.textContent = '✓ File received successfully!';
+    }
+
+    // UI Event Handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) createOffer(file);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) createOffer(file);
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(shareCode.textContent).then(() => {
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      });
+    });
+
+    connectBtn.addEventListener('click', () => {
+      const code = codeInput.value.toUpperCase().trim();
+      if (code.length === 6) {
+        createAnswer(code);
+      } else {
+        showStatus('Please enter a valid 6-character code', 'error');
+      }
+    });
+
+    codeInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+
+    codeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        connectBtn.click();
+      }
+    });
+  </script>
 </body>
 </html>
