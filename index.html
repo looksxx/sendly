@@ -1,244 +1,890 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sendly — Private File Sharing</title>
-<link rel="icon" href="logo.png" type="image/png" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sendly | Private File Sharing</title>
+  <link rel="icon" href="logo.png" type="image/png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    input, textarea {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
 
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{
-  font-family:Inter,system-ui,sans-serif;
-  background:radial-gradient(circle at top,#1a1a1a,#0a0a0a 70%);
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px
-}
-input[type=file]{display:none}
-
-.container{
-  background:#fff;
-  max-width:520px;
-  width:100%;
-  border-radius:22px;
-  padding:44px;
-  box-shadow:0 25px 70px rgba(0,0,0,.45)
-}
-
-h1{text-align:center;font-size:30px}
-.subtitle{text-align:center;color:#6b7280;font-size:14px;margin-bottom:32px}
-
-.drop-zone{
-  border:1.5px dashed #d1d5db;
-  border-radius:16px;
-  padding:52px 24px;
-  text-align:center;
-  cursor:pointer;
-  background:#f9fafb
-}
-.drop-zone.dragover{background:#e5e7eb;border-color:#000}
-
-.file-info{display:none;margin-top:24px}
-.file-info.active{display:block}
-
-.share-code{
-  font-family:monospace;
-  font-size:26px;
-  letter-spacing:8px;
-  text-align:center;
-  padding:16px;
-  background:#000;
-  color:#fff;
-  border-radius:14px;
-  margin:12px 0
-}
-
-.btn{
-  width:100%;
-  background:#000;
-  color:#fff;
-  border:none;
-  border-radius:14px;
-  padding:14px;
-  font-weight:600;
-  cursor:pointer
-}
-
-.or-divider{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  font-size:11px;
-  color:#9ca3af;
-  margin:32px 0
-}
-.or-divider::before,.or-divider::after{
-  content:"";flex:1;height:1px;background:#e5e7eb
-}
-
-.input-section{
-  background:#f9fafb;
-  border:1px solid #e5e7eb;
-  border-radius:16px;
-  padding:20px
-}
-
-.code-input{
-  width:100%;
-  padding:14px;
-  font-size:22px;
-  text-align:center;
-  letter-spacing:6px;
-  border-radius:14px;
-  border:1.5px solid #d1d5db;
-  margin-bottom:12px;
-  font-family:monospace
-}
-
-.status{margin-top:16px;font-size:13px}
-</style>
-</head>
-
-<body>
-<div class="container">
-  <h1>Sendly</h1>
-  <p class="subtitle">Private peer-to-peer file sharing</p>
-
-  <div class="drop-zone" id="dropZone">Drop a file to share</div>
-  <input type="file" id="fileInput">
-
-  <div class="file-info" id="fileInfo">
-    <div class="share-code" id="shareCode">------</div>
-    <button class="btn" id="copyBtn">Copy Code</button>
-  </div>
-
-  <div class="or-divider">OR</div>
-
-  <div class="input-section">
-    <input class="code-input" id="codeInput" placeholder="XXXXXX" maxlength="6">
-    <button class="btn" id="connectBtn">Connect</button>
-  </div>
-
-  <div class="status" id="status"></div>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get, remove, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDm6YJ19Pnh718AjjIN32KxltRo6qpgqtM",
-  authDomain: "sendly-83909.firebaseapp.com",
-  databaseURL: "https://sendly-83909-default-rtdb.firebaseio.com",
-  projectId: "sendly-83909"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const fileInfo = document.getElementById("fileInfo");
-const shareCode = document.getElementById("shareCode");
-const copyBtn = document.getElementById("copyBtn");
-const codeInput = document.getElementById("codeInput");
-const connectBtn = document.getElementById("connectBtn");
-const status = document.getElementById("status");
-
-let pc, channel, file;
-
-const rtcConfig = {
-  iceServers:[{urls:"stun:stun.l.google.com:19302"}]
-};
-
-const genCode = () =>
-  Math.random().toString(36).substring(2,8).toUpperCase();
-
-function log(msg){ status.textContent = msg }
-
-dropZone.onclick = () => fileInput.click();
-
-fileInput.onchange = async e => {
-  file = e.target.files[0];
-  if(!file) return;
-
-  const code = genCode();
-  shareCode.textContent = code;
-  fileInfo.classList.add("active");
-  log("Waiting for receiver…");
-
-  pc = new RTCPeerConnection(rtcConfig);
-  channel = pc.createDataChannel("file");
-
-  channel.onopen = async () => {
-    log("Sending file…");
-    channel.send(file.name);
-    channel.send(await file.arrayBuffer());
-    log("File sent ✓");
-  };
-
-  pc.onicecandidate = e=>{
-    if(e.candidate)
-      set(ref(db,`ice/${code}/sender`),e.candidate.toJSON());
-  };
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-
-  await set(ref(db,`offers/${code}`),{sdp:offer.sdp});
-
-  onChildAdded(ref(db,`answers/${code}`), async snap=>{
-    await pc.setRemoteDescription({type:"answer",sdp:snap.val().sdp});
-    remove(ref(db,`answers/${code}`));
-  });
-};
-
-connectBtn.onclick = async () => {
-  const code = codeInput.value.trim().toUpperCase();
-  if(code.length!==6) return log("Invalid code");
-
-  const snap = await get(ref(db,`offers/${code}`));
-  if(!snap.exists()) return log("Code not found");
-
-  pc = new RTCPeerConnection(rtcConfig);
-
-  pc.ondatachannel = e=>{
-    channel = e.channel;
-    channel.onmessage = msg=>{
-      if(typeof msg.data === "string") {
-        file = { name: msg.data, chunks: [] };
-      } else {
-        const blob = new Blob([msg.data]);
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = file.name;
-        a.click();
-        log("Download complete ✓");
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    @media (max-width: 600px) {
+      .container {
+        padding: 25px;
+        border-radius: 15px;
+        max-width: 100%;
       }
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 24px;
+      }
+      
+      .subtitle {
+        font-size: 13px;
+      }
+    }
+
+    .drop-zone {
+      border: 3px dashed #667eea;
+      border-radius: 15px;
+      padding: 60px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: #f8f9ff;
+    }
+
+    .drop-zone:hover {
+      border-color: #764ba2;
+      background: #f0f2ff;
+    }
+
+    .drop-zone.dragover {
+      border-color: #764ba2;
+      background: #e8ebff;
+      transform: scale(1.02);
+    }
+
+    .drop-zone-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .drop-zone-text {
+      color: #667eea;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .drop-zone-hint {
+      color: #999;
+      font-size: 14px;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .file-info {
+      background: #f8f9ff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+      display: none;
+    }
+
+    .file-info.active {
+      display: block;
+    }
+
+    .file-name {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+
+    .file-size {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    .share-code {
+      background: white;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      padding: 20px;
+      font-size: 32px;
+      text-align: center;
+      margin-bottom: 10px;
+      color: #667eea;
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      letter-spacing: 8px;
+    }
+    
+    @media (max-width: 600px) {
+      .share-code {
+        font-size: 24px;
+        letter-spacing: 4px;
+        padding: 15px;
+      }
+    }
+
+    .code-label {
+      text-align: center;
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 15px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.active {
+      display: block;
+    }
+
+    .status.info {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .status.success {
+      background: #e8f5e9;
+      color: #388e3c;
+    }
+
+    .status.error {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .progress-bar.active {
+      display: block;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      width: 0%;
+      transition: width 0.2s;
+    }
+
+    .peer-info {
+      color: #666;
+      font-size: 13px;
+      margin-top: 15px;
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+    }
+
+    .connection-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffa726;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+
+    .connection-status.connected {
+      background: #66bb6a;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 15px;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .stat {
+      text-align: center;
+      flex: 1;
+      min-width: 80px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
+    
+    @media (max-width: 600px) {
+      .stat-value {
+        font-size: 16px;
+      }
+      
+      .stat-label {
+        font-size: 10px;
+      }
+    }
+
+    .input-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8f9ff;
+      border-radius: 10px;
+    }
+
+    .input-label {
+      font-size: 14px;
+      color: #667eea;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .code-input {
+      width: 100%;
+      padding: 15px;
+      font-size: 24px;
+      text-align: center;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    .code-input:focus {
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+    
+    @media (max-width: 600px) {
+      .code-input {
+        font-size: 20px;
+        letter-spacing: 4px;
+        padding: 12px;
+      }
+    }
+
+    .or-divider {
+      text-align: center;
+      margin: 20px 0;
+      color: #999;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="text-align: center;">
+      <h1>📁 P2P File Transfer</h1>
+      <p class="subtitle">Share files between any devices. Fast transfer.</p>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-icon">📤</div>
+      <div class="drop-zone-text">Drop a file here or click to select</div>
+      <div class="drop-zone-hint">Works on any device • No size limit • Fast</div>
+    </div>
+
+    <input type="file" id="fileInput" class="file-input">
+
+    <div class="file-info" id="fileInfo">
+      <div class="file-name" id="fileName"></div>
+      <div class="file-size" id="fileSize"></div>
+      
+      <div class="share-code" id="shareCode">------</div>
+      <div class="code-label">Share this code with the receiver</div>
+      
+      <button class="btn" id="copyBtn">📋 Copy Code</button>
+
+      <div class="peer-info" id="peerInfo">
+        <span class="connection-status" id="connectionStatus"></span>
+        <span id="statusText">Waiting for device to connect...</span>
+      </div>
+    </div>
+
+    <div class="or-divider" id="orDivider">OR</div>
+
+    <div class="input-section" id="inputSection">
+      <div class="input-label">Enter transfer code to receive file:</div>
+      <input type="text" id="codeInput" class="code-input" placeholder="XXXXXX" maxlength="6">
+      <button class="btn" id="connectBtn">🔗 Connect & Download</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div class="stats" id="stats" style="display: none;">
+      <div class="stat">
+        <div class="stat-value" id="progressPercent">0%</div>
+        <div class="stat-label">Progress</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="transferSpeed">0 MB/s</div>
+        <div class="stat-label">Speed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="timeRemaining">--:--</div>
+        <div class="stat-label">Time Left</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { getDatabase, ref, set, get, remove, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDm6YJ19Pnh718AjjIN32KxltRo6qpgqtM",
+      authDomain: "sendly-83909.firebaseapp.com",
+      databaseURL: "https://sendly-83909-default-rtdb.firebaseio.com",
+      projectId: "sendly-83909",
+      storageBucket: "sendly-83909.firebasestorage.app",
+      messagingSenderId: "1075199067786",
+      appId: "1:1075199067786:web:55163b960bd5c26f6d4f73"
     };
-  };
 
-  pc.onicecandidate = e=>{
-    if(e.candidate)
-      set(ref(db,`ice/${code}/receiver`),e.candidate.toJSON());
-  };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-  await pc.setRemoteDescription({type:"offer",sdp:snap.val().sdp});
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await set(ref(db,`answers/${code}`),{sdp:answer.sdp});
-};
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const shareCode = document.getElementById('shareCode');
+    const copyBtn = document.getElementById('copyBtn');
+    const status = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const statusText = document.getElementById('statusText');
+    const stats = document.getElementById('stats');
+    const progressPercent = document.getElementById('progressPercent');
+    const transferSpeed = document.getElementById('transferSpeed');
+    const timeRemaining = document.getElementById('timeRemaining');
+    const inputSection = document.getElementById('inputSection');
+    const codeInput = document.getElementById('codeInput');
+    const connectBtn = document.getElementById('connectBtn');
+    const orDivider = document.getElementById('orDivider');
 
-copyBtn.onclick = () =>
-  navigator.clipboard.writeText(shareCode.textContent);
-</script>
+    let peerConnection = null;
+    let dataChannel = null;
+    let selectedFile = null;
+    let receivedChunks = [];
+    let receivedSize = 0;
+    let totalSize = 0;
+    let fileMetadata = null;
+    let startTime = 0;
+    let lastUpdate = 0;
+    let bytesAtLastUpdate = 0;
+    let transferCode = null;
+
+    const CHUNK_SIZE = 1048576; // 1MB chunks for maximum speed
+
+    const config = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
+      ]
+    };
+
+    function generateCode() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+    }
+
+    function formatSpeed(bytesPerSecond) {
+      return formatFileSize(bytesPerSecond) + '/s';
+    }
+
+    function formatTime(seconds) {
+      if (!isFinite(seconds) || seconds < 0) return '--:--';
+      if (seconds < 60) return Math.floor(seconds) + 's';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = 'status active ' + type;
+    }
+
+    function updateConnectionStatus(connected) {
+      if (connected) {
+        connectionStatus.classList.add('connected');
+        statusText.textContent = '✓ Connected!';
+      } else {
+        connectionStatus.classList.remove('connected');
+      }
+    }
+
+    function updateProgress(current, total) {
+      const now = Date.now();
+      const percent = (current / total * 100);
+      progressFill.style.width = percent + '%';
+      progressPercent.textContent = percent.toFixed(1) + '%';
+
+      if (now - lastUpdate > 500) {
+        const timeDiff = (now - lastUpdate) / 1000;
+        const bytesDiff = current - bytesAtLastUpdate;
+        const speed = bytesDiff / timeDiff;
+        
+        transferSpeed.textContent = formatSpeed(speed);
+        
+        const remaining = (total - current) / speed;
+        timeRemaining.textContent = formatTime(remaining);
+        
+        lastUpdate = now;
+        bytesAtLastUpdate = current;
+      }
+    }
+
+    // SENDER
+    async function createOffer(file) {
+      selectedFile = file;
+      transferCode = generateCode();
+      
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      shareCode.textContent = transferCode;
+      
+      fileInfo.classList.add('active');
+      dropZone.style.display = 'none';
+      inputSection.style.display = 'none';
+      orDivider.style.display = 'none';
+
+      showStatus('Setting up connection...', 'info');
+      statusText.textContent = 'Creating offer...';
+
+      peerConnection = new RTCPeerConnection(config);
+      
+      dataChannel = peerConnection.createDataChannel('fileTransfer', {
+        ordered: false,  // Unordered for speed
+        maxRetransmits: 0  // No retransmits for maximum speed
+      });
+      dataChannel.binaryType = 'arraybuffer';
+
+      dataChannel.onopen = async () => {
+        updateConnectionStatus(true);
+        showStatus('✓ Connected! Starting transfer...', 'success');
+        statusText.textContent = 'Transferring...';
+        await sendFile();
+      };
+
+      // Collect ICE candidates
+      const iceCandidates = [];
+      peerConnection.onicecandidate = async (event) => {
+        if (event.candidate) {
+          iceCandidates.push(event.candidate.toJSON());
+        } else {
+          // All candidates gathered, save to Firebase
+          await set(ref(db, `offers/${transferCode}`), {
+            sdp: peerConnection.localDescription.sdp,
+            candidates: iceCandidates,
+            fileInfo: {
+              name: file.name,
+              size: file.size,
+              type: file.type
+            },
+            timestamp: Date.now()
+          });
+          
+          showStatus('✓ Code ready! Share with receiver.', 'success');
+          statusText.textContent = 'Waiting for receiver...';
+        }
+      };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      // Listen for answer
+      const answerRef = ref(db, `answers/${transferCode}`);
+      onValue(answerRef, async (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          
+          await peerConnection.setRemoteDescription({
+            type: 'answer',
+            sdp: data.sdp
+          });
+
+          // Add ICE candidates from receiver
+          if (data.candidates) {
+            for (const candidate of data.candidates) {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+          }
+
+          statusText.textContent = 'Establishing connection...';
+          
+          // Cleanup
+          await remove(answerRef);
+        }
+      });
+    }
+
+    async function sendFile() {
+      if (!selectedFile || !dataChannel) return;
+
+      stats.style.display = 'flex';
+      progressBar.classList.add('active');
+      startTime = Date.now();
+      lastUpdate = startTime;
+      bytesAtLastUpdate = 0;
+
+      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+      const chunks = [];
+      
+      // Pre-read all chunks for faster sending
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, selectedFile.size);
+        const chunk = selectedFile.slice(start, end);
+        chunks.push({
+          index: i,
+          data: await chunk.arrayBuffer()
+        });
+      }
+
+      // Send chunks rapidly
+      let currentChunk = 0;
+      const sendNextBatch = () => {
+        while (currentChunk < totalChunks && dataChannel.bufferedAmount < CHUNK_SIZE * 8) {
+          const chunk = chunks[currentChunk];
+          
+          // Send index first, then data (for unordered channel)
+          dataChannel.send(new Uint32Array([chunk.index]).buffer);
+          dataChannel.send(chunk.data);
+          
+          currentChunk++;
+          const progress = Math.min(currentChunk * CHUNK_SIZE, selectedFile.size);
+          updateProgress(progress, selectedFile.size);
+        }
+
+        if (currentChunk < totalChunks) {
+          setTimeout(sendNextBatch, 1);
+        } else {
+          // Send completion signal
+          dataChannel.send(new Uint32Array([0xFFFFFFFF]).buffer);
+          showStatus('✓ Transfer complete!', 'success');
+          statusText.textContent = '✓ File sent successfully!';
+          
+          // Cleanup Firebase
+          remove(ref(db, `offers/${transferCode}`));
+        }
+      };
+
+      sendNextBatch();
+    }
+
+    // RECEIVER
+    async function createAnswer(code) {
+      showStatus('Looking for transfer...', 'info');
+      
+      const offerSnapshot = await get(ref(db, `offers/${code}`));
+      
+      if (!offerSnapshot.exists()) {
+        showStatus('❌ Invalid code or transfer expired', 'error');
+        return;
+      }
+
+      const offerData = offerSnapshot.val();
+      fileMetadata = offerData.fileInfo;
+      totalSize = fileMetadata.size;
+
+      fileName.textContent = fileMetadata.name;
+      fileSize.textContent = formatFileSize(fileMetadata.size);
+      fileInfo.classList.add('active');
+      
+      dropZone.style.display = 'none';
+      inputSection.style.display = 'none';
+      orDivider.style.display = 'none';
+
+      showStatus('✓ Found transfer! Connecting...', 'success');
+      statusText.textContent = 'Establishing connection...';
+
+      peerConnection = new RTCPeerConnection(config);
+
+      peerConnection.ondatachannel = (event) => {
+        dataChannel = event.channel;
+        dataChannel.binaryType = 'arraybuffer';
+
+        const chunkMap = new Map();
+        const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+        let receivedChunkCount = 0;
+        let expectingIndex = true;
+        let currentIndex = null;
+
+        dataChannel.onmessage = (e) => {
+          if (expectingIndex) {
+            // Receiving chunk index
+            const indexArray = new Uint32Array(e.data);
+            currentIndex = indexArray[0];
+            
+            if (currentIndex === 0xFFFFFFFF) {
+              // Completion signal received
+              assembleFile();
+              return;
+            }
+            
+            expectingIndex = false;
+          } else {
+            // Receiving chunk data
+            chunkMap.set(currentIndex, e.data);
+            receivedChunkCount++;
+            
+            const receivedBytes = receivedChunkCount * CHUNK_SIZE;
+            updateProgress(Math.min(receivedBytes, totalSize), totalSize);
+            
+            expectingIndex = true;
+          }
+        };
+
+        function assembleFile() {
+          // Reassemble chunks in order
+          const orderedChunks = [];
+          for (let i = 0; i < totalChunks; i++) {
+            if (chunkMap.has(i)) {
+              orderedChunks.push(chunkMap.get(i));
+            }
+          }
+          
+          const blob = new Blob(orderedChunks, { type: fileMetadata.type });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileMetadata.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          showStatus('✓ Download complete!', 'success');
+          statusText.textContent = '✓ File received successfully!';
+          progressFill.style.width = '100%';
+          progressPercent.textContent = '100%';
+        }
+
+        dataChannel.onopen = () => {
+          updateConnectionStatus(true);
+          showStatus('✓ Connected! Receiving file...', 'success');
+          statusText.textContent = 'Downloading...';
+          stats.style.display = 'flex';
+          progressBar.classList.add('active');
+          startTime = Date.now();
+          lastUpdate = startTime;
+          bytesAtLastUpdate = 0;
+        };
+      };
+
+      // Collect ICE candidates
+      const iceCandidates = [];
+      peerConnection.onicecandidate = async (event) => {
+        if (event.candidate) {
+          iceCandidates.push(event.candidate.toJSON());
+        } else {
+          // All candidates gathered, save answer to Firebase
+          await set(ref(db, `answers/${code}`), {
+            sdp: peerConnection.localDescription.sdp,
+            candidates: iceCandidates,
+            timestamp: Date.now()
+          });
+        }
+      };
+
+      await peerConnection.setRemoteDescription({
+        type: 'offer',
+        sdp: offerData.sdp
+      });
+
+      // Add ICE candidates from sender
+      if (offerData.candidates) {
+        for (const candidate of offerData.candidates) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      }
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+    }
+
+    function saveReceivedFile() {
+      const blob = new Blob(receivedChunks, { type: fileMetadata.type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileMetadata.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus('✓ Download complete!', 'success');
+      statusText.textContent = '✓ File received successfully!';
+    }
+
+    // UI Event Handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) createOffer(file);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) createOffer(file);
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(shareCode.textContent).then(() => {
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      });
+    });
+
+    connectBtn.addEventListener('click', () => {
+      const code = codeInput.value.toUpperCase().trim();
+      if (code.length === 6) {
+        createAnswer(code);
+      } else {
+        showStatus('Please enter a valid 6-character code', 'error');
+      }
+    });
+
+    codeInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+
+    codeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        connectBtn.click();
+      }
+    });
+  </script>
 </body>
 </html>
-
