@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sendly | Send Files</title>
+  <title>Sendly</title>
   <link rel="icon" href="logo.png" type="image/png">
   <style>
     * {
@@ -373,13 +373,13 @@
   <div class="container">
     <div style="text-align: center;">
       <h1>📁 P2P File Transfer</h1>
-      <p class="subtitle">Share files between any devices. Lightning-fast peer-to-peer transfer.</p>
+      <p class="subtitle">Share files between any devices. Fast transfer.</p>
     </div>
 
     <div class="drop-zone" id="dropZone">
       <div class="drop-zone-icon">📤</div>
       <div class="drop-zone-text">Drop a file here or click to select</div>
-      <div class="drop-zone-hint">Works on any device • No size limit • Ultra-fast</div>
+      <div class="drop-zone-hint">Works on any device • No size limit • Fast</div>
     </div>
 
     <input type="file" id="fileInput" class="file-input">
@@ -395,7 +395,7 @@
 
       <div class="peer-info" id="peerInfo">
         <span class="connection-status" id="connectionStatus"></span>
-        <span id="statusText">Waiting for peer to connect...</span>
+        <span id="statusText">Waiting for device to connect...</span>
       </div>
     </div>
 
@@ -479,7 +479,7 @@
     let bytesAtLastUpdate = 0;
     let transferCode = null;
 
-    const CHUNK_SIZE = 262144;
+    const CHUNK_SIZE = 1048576; // 1MB chunks for maximum speed
 
     const config = {
       iceServers: [
@@ -569,7 +569,8 @@
       peerConnection = new RTCPeerConnection(config);
       
       dataChannel = peerConnection.createDataChannel('fileTransfer', {
-        ordered: true
+        ordered: false,  // Unordered for speed
+        maxRetransmits: 0  // No retransmits for maximum speed
       });
       dataChannel.binaryType = 'arraybuffer';
 
@@ -641,28 +642,49 @@
       lastUpdate = startTime;
       bytesAtLastUpdate = 0;
 
-      const chunkCount = Math.ceil(selectedFile.size / CHUNK_SIZE);
+      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+      const chunks = [];
       
-      for (let i = 0; i < chunkCount; i++) {
+      // Pre-read all chunks for faster sending
+      for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, selectedFile.size);
         const chunk = selectedFile.slice(start, end);
-        
-        const arrayBuffer = await chunk.arrayBuffer();
-        
-        while (dataChannel.bufferedAmount > CHUNK_SIZE * 4) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        
-        dataChannel.send(arrayBuffer);
-        updateProgress(end, selectedFile.size);
+        chunks.push({
+          index: i,
+          data: await chunk.arrayBuffer()
+        });
       }
 
-      showStatus('✓ Transfer complete!', 'success');
-      statusText.textContent = '✓ File sent successfully!';
-      
-      // Cleanup Firebase
-      await remove(ref(db, `offers/${transferCode}`));
+      // Send chunks rapidly
+      let currentChunk = 0;
+      const sendNextBatch = () => {
+        while (currentChunk < totalChunks && dataChannel.bufferedAmount < CHUNK_SIZE * 8) {
+          const chunk = chunks[currentChunk];
+          
+          // Send index first, then data (for unordered channel)
+          dataChannel.send(new Uint32Array([chunk.index]).buffer);
+          dataChannel.send(chunk.data);
+          
+          currentChunk++;
+          const progress = Math.min(currentChunk * CHUNK_SIZE, selectedFile.size);
+          updateProgress(progress, selectedFile.size);
+        }
+
+        if (currentChunk < totalChunks) {
+          setTimeout(sendNextBatch, 1);
+        } else {
+          // Send completion signal
+          dataChannel.send(new Uint32Array([0xFFFFFFFF]).buffer);
+          showStatus('✓ Transfer complete!', 'success');
+          statusText.textContent = '✓ File sent successfully!';
+          
+          // Cleanup Firebase
+          remove(ref(db, `offers/${transferCode}`));
+        }
+      };
+
+      sendNextBatch();
     }
 
     // RECEIVER
@@ -697,15 +719,61 @@
         dataChannel = event.channel;
         dataChannel.binaryType = 'arraybuffer';
 
-        dataChannel.onmessage = (e) => {
-          receivedChunks.push(e.data);
-          receivedSize += e.data.byteLength;
-          updateProgress(receivedSize, totalSize);
+        const chunkMap = new Map();
+        const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+        let receivedChunkCount = 0;
+        let expectingIndex = true;
+        let currentIndex = null;
 
-          if (receivedSize >= totalSize) {
-            saveReceivedFile();
+        dataChannel.onmessage = (e) => {
+          if (expectingIndex) {
+            // Receiving chunk index
+            const indexArray = new Uint32Array(e.data);
+            currentIndex = indexArray[0];
+            
+            if (currentIndex === 0xFFFFFFFF) {
+              // Completion signal received
+              assembleFile();
+              return;
+            }
+            
+            expectingIndex = false;
+          } else {
+            // Receiving chunk data
+            chunkMap.set(currentIndex, e.data);
+            receivedChunkCount++;
+            
+            const receivedBytes = receivedChunkCount * CHUNK_SIZE;
+            updateProgress(Math.min(receivedBytes, totalSize), totalSize);
+            
+            expectingIndex = true;
           }
         };
+
+        function assembleFile() {
+          // Reassemble chunks in order
+          const orderedChunks = [];
+          for (let i = 0; i < totalChunks; i++) {
+            if (chunkMap.has(i)) {
+              orderedChunks.push(chunkMap.get(i));
+            }
+          }
+          
+          const blob = new Blob(orderedChunks, { type: fileMetadata.type });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileMetadata.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          showStatus('✓ Download complete!', 'success');
+          statusText.textContent = '✓ File received successfully!';
+          progressFill.style.width = '100%';
+          progressPercent.textContent = '100%';
+        }
 
         dataChannel.onopen = () => {
           updateConnectionStatus(true);
@@ -820,4 +888,3 @@
   </script>
 </body>
 </html>
-
